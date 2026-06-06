@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — Contract Analyser</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px 60px;
+    }
+    .login-card { width: 100%; max-width: 400px; }
+    .login-body {
+      padding: 24px 28px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: .85rem; font-weight: 600; color: var(--text); }
+    .password-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .9rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--card-bg);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .password-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+    }
+    .btn-primary { width: 100%; justify-content: center; padding: 11px 20px; font-size: .95rem; }
+    .login-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #991b1b;
+      font-size: .85rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Contract Analyser</span>
+      </div>
+      <p class="tagline">AI-powered entertainment contract review</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="login-card card">
+      <div class="card-header">
+        <h2>Sign In</h2>
+        <p>Enter your password to access the contract analyser.</p>
+      </div>
+      <div class="login-body">
+        <div id="loginError" class="login-error hidden">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Incorrect password. Please try again.</span>
+        </div>
+        <div class="form-group">
+          <label for="passwordInput">Password</label>
+          <input type="password" id="passwordInput" class="password-input" placeholder="Enter password" autofocus>
+        </div>
+        <button id="submitBtn" class="btn-primary" onclick="submitLogin()">
+          Sign In
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>Powered by Claude AI &nbsp;·&nbsp; For informational purposes only &nbsp;·&nbsp; Not legal advice</p>
+  </footer>
+
+  <script>
+    const btn = document.getElementById('submitBtn');
+    const originalBtnHTML = btn.innerHTML;
+
+    async function submitLogin() {
+      const password = document.getElementById('passwordInput').value;
+      const error = document.getElementById('loginError');
+
+      if (!password) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      error.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          error.classList.remove('hidden');
+          btn.disabled = false;
+          btn.innerHTML = originalBtnHTML;
+          document.getElementById('passwordInput').select();
+        }
+      } catch {
+        error.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHTML;
+      }
+    }
+
+    document.getElementById('passwordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitLogin();
+    });
+  </script>
+</body>
+</html>

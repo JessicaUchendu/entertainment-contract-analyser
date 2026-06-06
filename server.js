@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import { createHmac } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -9,8 +10,59 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '1mb' }));
+
+// ── Auth ──────────────────────────────────────────────
+const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD;
+const COOKIE_NAME = 'ca_auth';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+
+function getExpectedToken() {
+  return createHmac('sha256', 'contract-analyser-v1').update(ACCESS_PASSWORD).digest('hex');
+}
+
+function parseCookies(req) {
+  const str = req.headers.cookie || '';
+  if (!str) return {};
+  return Object.fromEntries(
+    str.split(';').filter(Boolean).map(c => {
+      const idx = c.indexOf('=');
+      return [c.slice(0, idx).trim(), c.slice(idx + 1).trim()];
+    })
+  );
+}
+
+function isAuthenticated(req) {
+  if (!ACCESS_PASSWORD) return true;
+  return parseCookies(req)[COOKIE_NAME] === getExpectedToken();
+}
+
+// Allow login page assets through without auth; block everything else
+app.use((req, res, next) => {
+  if (!ACCESS_PASSWORD) return next();
+  const open = ['/login.html', '/style.css', '/api/login'];
+  if (open.includes(req.path)) return next();
+  if (!isAuthenticated(req)) return res.sendFile(join(__dirname, 'public', 'login.html'));
+  next();
+});
+
 app.use(express.static(join(__dirname, 'public')));
 
+// ── Login endpoint ────────────────────────────────────
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+
+  if (!ACCESS_PASSWORD) return res.json({ success: true });
+
+  if (!password || password !== ACCESS_PASSWORD) {
+    return res.status(401).json({ error: 'Incorrect password.' });
+  }
+
+  const token = getExpectedToken();
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Max-Age=${COOKIE_MAX_AGE}; Path=/`);
+  res.json({ success: true });
+});
+
+// ── Anthropic client ──────────────────────────────────
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const SYSTEM_PROMPT = `You are an expert entertainment lawyer with decades of experience reviewing music, film, television, and publishing contracts. Analyse contracts thoroughly and identify key clauses, flagging any concerns.
@@ -35,6 +87,8 @@ const CLAUSE_TYPES = [
 ];
 
 app.post('/api/analyze', async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'Unauthorized.' });
+
   const { contractText } = req.body;
 
   if (!contractText || typeof contractText !== 'string' || !contractText.trim()) {
